@@ -1,0 +1,54 @@
+﻿@inject AuthenticationService _authService
+
+<EditForm Model="credentials" OnValidSubmit="SignInAsync">
+    <DataAnnotationsValidator />
+
+    <div class="form-group">
+        <label for="userName">User Name</label>
+        <InputText id="userName" @bind-Value="credentials.UserName" class="form-control" />
+        <small class="form-text">
+            <ValidationMessage For="@(() => credentials.UserName)" />
+        </small>
+    </div>
+    <div class="form-group">
+        <label for="password">Password</label>
+        <InputText id="password" @bind-Value="credentials.Password" type="password" class="form-control" />
+        <small class="form-text">
+            <ValidationMessage For="@(() => credentials.Password)" />
+        </small>
+    </div>
+    <div class="form-group form-check">
+        <InputCheckbox @bind-Value="credentials.RememberMe" class="form-check-input" id="rememberMe" />
+        <label class="form-check-label" for="rememberMe">Remember Me</label>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(errorText))
+    {
+        <div class="text-danger">
+            @errorText
+            <p />
+        </div>
+    }
+
+    <button class="btn btn-primary" type="submit">
+        Login
+    </button>
+</EditForm>
+
+@code {
+    private Credentials credentials = new Credentials();
+    private string errorText = "";
+
+    public async Task SignInAsync()
+    {
+        var result = await _authService.SignInAsync(credentials);
+
+        if (!result.Succeeded)
+        {
+            if (result.IsLockedOut)
+                errorText = "Account temporarily locked.";
+            else
+                errorText = "Invalid sign in attempt.";
+        }
+    }
+}
