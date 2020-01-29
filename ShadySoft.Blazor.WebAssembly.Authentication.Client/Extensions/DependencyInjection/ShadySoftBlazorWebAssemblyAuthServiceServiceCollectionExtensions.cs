@@ -12,6 +12,7 @@ namespace Microsoft.Extensions.DependencyInjection
     {
         public static IServiceCollection AddWebAssemblyAuthenticationService(this IServiceCollection services)
         {
+            services.AddAuthorizationCore();
             services.AddSingleton<AuthenticationService>();
             services.AddSingleton<AuthenticationStateProvider>(sp => sp.GetRequiredService<AuthenticationService>());
             return services;
