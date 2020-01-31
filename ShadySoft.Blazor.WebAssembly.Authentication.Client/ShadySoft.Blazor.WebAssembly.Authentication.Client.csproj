@@ -3,12 +3,13 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <RazorLangVersion>3.0</RazorLangVersion>
-    <Version>1.0.0-dev200129-3</Version>
+    <Version>1.0.0-dev200131-10</Version>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
   </PropertyGroup>
 
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Blazor.HttpClient" Version="3.2.0-preview1.20073.1" />
     <PackageReference Include="Microsoft.AspNetCore.Components" Version="3.1.0" />
     <PackageReference Include="Microsoft.AspNetCore.Components.Authorization" Version="3.1.0" />
     <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="3.1.0" />
