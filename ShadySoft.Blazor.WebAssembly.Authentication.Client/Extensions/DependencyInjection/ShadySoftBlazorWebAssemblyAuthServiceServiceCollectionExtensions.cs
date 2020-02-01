@@ -10,14 +10,19 @@ namespace Microsoft.Extensions.DependencyInjection
 {
     public static class ShadySoftBlazorWebAssemblyAuthServiceServiceCollectionExtensions
     {
-        public static IServiceCollection AddWebAssemblyAuthenticationService<TCredential>(this IServiceCollection services) =>
-            services.AddWebAssemblyAuthenticationService<TCredential>(null);
+        public static IServiceCollection AddWebAssemblyAuthenticationService<TCredential>(this IServiceCollection services, bool useAsyncService = false) =>
+            services.AddWebAssemblyAuthenticationService<TCredential>(null, useAsyncService);
 
-        public static IServiceCollection AddWebAssemblyAuthenticationService<TCredential>(this IServiceCollection services, Action<ClientAuthenticationOptions> setupAction)
+        public static IServiceCollection AddWebAssemblyAuthenticationService<TCredential>(this IServiceCollection services, Action<ClientAuthenticationOptions> setupAction, bool useAsyncService = false)
         {
             services.AddAuthorizationCore();
-            services.AddSingleton<AuthenticationService<TCredential>>();
-            services.AddSingleton<AuthenticationStateProvider>(sp => sp.GetRequiredService<AuthenticationService<TCredential>>());
+
+            if (useAsyncService)
+                services.AddSingleton<IAuthenticationService<TCredential>, AsyncAuthenticationService<TCredential>>();
+            else
+                services.AddSingleton<IAuthenticationService<TCredential>, AuthenticationService<TCredential>>();
+
+            services.AddSingleton(sp => (AuthenticationStateProvider)sp.GetRequiredService<IAuthenticationService<TCredential>>());
 
             if (setupAction != null)
             {

@@ -10,14 +10,13 @@ using ShadySoft.HttpClientExtensions;
 
 namespace ShadySoft.Blazor.WebAssembly.Authentication.Client
 {
-    public class AuthenticationService<TCredential> : AuthenticationStateProvider
+    public class AuthenticationService<TCredential> : AuthenticationStateProvider, IAuthenticationService<TCredential>
     {
-        private Task<AuthenticationState> authenticationStateTask;
+        private AuthenticationState authenticationState;
         private readonly ClientAuthenticationOptions _options;
         private readonly HttpClient _http;
 
         private static AuthenticationState newUnauthenticatedState = new AuthenticationState(new ClaimsPrincipal());
-        private static Task<AuthenticationState> newUnauthenticatedStateTask => Task.FromResult(newUnauthenticatedState);
 
         public SignInResult LastSignInResult { get; private set; } = SignInResult.Success;
 
@@ -27,102 +26,81 @@ namespace ShadySoft.Blazor.WebAssembly.Authentication.Client
             _http = http;
         }
 
-        public override Task<AuthenticationState> GetAuthenticationStateAsync()
+        public override async Task<AuthenticationState> GetAuthenticationStateAsync()
         {
-            if (authenticationStateTask is null)
+            if (authenticationState is null)
             {
-                var resultSource = new TaskCompletionSource<bool>();
-                var stateSource = new TaskCompletionSource<AuthenticationState>();
-
-                authenticationStateTask = stateSource.Task;
-
-                ServerFetchUserInfoAsync(resultSource, stateSource);
+                await ServerRefreshUserInfoAsync();
             }
 
-            return authenticationStateTask;
-        }
-
-        public Task<SignInResult> SignInAsync(TCredential credentials)
-        {
-            var resultSource = new TaskCompletionSource<SignInResult>();
-            var stateSource = new TaskCompletionSource<AuthenticationState>();
-
-            authenticationStateTask = stateSource.Task;
-            NotifyAuthenticationStateChanged(authenticationStateTask);
-
-            ServerSignInAsync(credentials, resultSource, stateSource);
-
-            return resultSource.Task;
+            return authenticationState;
         }
 
         public async Task SignOutAsync()
         {
             await _http.PostAsync(_options.LogoutUrl, null);
-            authenticationStateTask = newUnauthenticatedStateTask;
-            NotifyAuthenticationStateChanged(authenticationStateTask);
+            authenticationState = newUnauthenticatedState;
+            NotifyAuthenticationStateChanged(GetAuthenticationStateAsync());
         }
 
-        public Task<bool> FetchUserInfoAsync(Task<AuthenticationState> task)
-        {
-            var resultSource = new TaskCompletionSource<bool>();
-            var stateSource = new TaskCompletionSource<AuthenticationState>();
-
-            authenticationStateTask = stateSource.Task;
-            NotifyAuthenticationStateChanged(authenticationStateTask);
-
-            ServerFetchUserInfoAsync(resultSource, stateSource);
-
-            return resultSource.Task;
-        }
-
-        private async Task ServerSignInAsync(TCredential credentials, TaskCompletionSource<SignInResult> resultSource, TaskCompletionSource<AuthenticationState> stateSource)
+        public async Task<SignInResult> SignInAsync(TCredential credentials)
         {
             try
             {
                 var claims = await _http.PostJsonWithPdAsync<Dictionary<string, string>>(_options.LoginUrl, credentials);
+                authenticationState = BuildAuthenticationState(claims);
+                NotifyAuthenticationStateChanged(GetAuthenticationStateAsync());
                 LastSignInResult = SignInResult.Success;
-                stateSource.SetResult(BuildAuthenticationStateTask(claims));
-                resultSource.SetResult(SignInResult.Success);
             }
             catch (HttpRequestException e)
             {
-                var result = e.GetSignInResult();
-                LastSignInResult = result;
-                stateSource.SetResult(newUnauthenticatedState);
-                resultSource.SetResult(result);
+                if (e.GetProblemDetails().Status == 400)
+                    LastSignInResult = e.GetSignInResult();
+                else
+                    throw e;
             }
+
+            return LastSignInResult;
         }
 
-        private async Task ServerFetchUserInfoAsync(TaskCompletionSource<bool> resultSource, TaskCompletionSource<AuthenticationState> stateSource)
+        public async Task<bool> RefreshUserInfoAsync()
+        {
+            var result = await ServerRefreshUserInfoAsync();
+            NotifyAuthenticationStateChanged(GetAuthenticationStateAsync());
+            return result;
+        }
+
+        private async Task<bool> ServerRefreshUserInfoAsync()
         {
             try
             {
                 var claims = await _http.GetJsonWithPdAsync<Dictionary<string, string>>(_options.UserUrl);
-                stateSource.SetResult(BuildAuthenticationStateTask(claims));
-                resultSource.SetResult(true);
+                authenticationState = BuildAuthenticationState(claims);
+                return true;
             }
             catch (HttpRequestException e)
             {
                 if (e.GetProblemDetails().Status == 404)
                 {
-                    stateSource.SetResult(newUnauthenticatedState);
-                    resultSource.SetResult(false);
+                    authenticationState = newUnauthenticatedState;
+                    return false;
                 }
                 else
-                {
                     throw e;
-                }
             }
         }
 
-        private AuthenticationState BuildAuthenticationStateTask(Dictionary<string, string> claims)
+
+
+        private AuthenticationState BuildAuthenticationState(Dictionary<string, string> claims)
         {
             var identity = new ClaimsIdentity("WebApiAuth");
 
-            foreach(var claim in claims)
+            foreach (var claim in claims)
                 identity.AddClaim(new Claim(claim.Key, claim.Value));
 
             return new AuthenticationState(new ClaimsPrincipal(identity));
         }
+
     }
 }
