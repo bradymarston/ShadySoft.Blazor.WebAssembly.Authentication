@@ -6,6 +6,7 @@ using System.Net.Http;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using ShadySoft.HttpClientExtensions;
 
 namespace ShadySoft.Blazor.WebAssembly.Authentication.Client
 {
@@ -78,16 +79,17 @@ namespace ShadySoft.Blazor.WebAssembly.Authentication.Client
         {
             try
             {
-                var claims = await _http.PostJsonAsync<Dictionary<string, string>>(_options.LoginUrl, credentials);
+                var claims = await _http.PostJsonWithPdAsync<Dictionary<string, string>>(_options.LoginUrl, credentials);
                 LastSignInResult = SignInResult.Success;
                 stateSource.SetResult(BuildAuthenticationStateTask(claims));
                 resultSource.SetResult(SignInResult.Success);
             }
-            catch (HttpRequestException)
+            catch (HttpRequestException e)
             {
-                LastSignInResult = SignInResult.Failed;
+                var result = e.GetSignInResult();
+                LastSignInResult = result;
                 stateSource.SetResult(newUnauthenticatedState);
-                resultSource.SetResult(SignInResult.Failed);
+                resultSource.SetResult(result);
             }
         }
 
@@ -95,14 +97,21 @@ namespace ShadySoft.Blazor.WebAssembly.Authentication.Client
         {
             try
             {
-                var claims = await _http.GetJsonAsync<Dictionary<string, string>>(_options.UserUrl);
+                var claims = await _http.GetJsonWithPdAsync<Dictionary<string, string>>(_options.UserUrl);
                 stateSource.SetResult(BuildAuthenticationStateTask(claims));
                 resultSource.SetResult(true);
             }
-            catch (HttpRequestException)
+            catch (HttpRequestException e)
             {
-                stateSource.SetResult(newUnauthenticatedState);
-                resultSource.SetResult(false);
+                if (e.GetProblemDetails().Status == 404)
+                {
+                    stateSource.SetResult(newUnauthenticatedState);
+                    resultSource.SetResult(false);
+                }
+                else
+                {
+                    throw e;
+                }
             }
         }
 
