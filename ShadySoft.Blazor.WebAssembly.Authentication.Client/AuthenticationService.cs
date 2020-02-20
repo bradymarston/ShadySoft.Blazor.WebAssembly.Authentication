@@ -16,7 +16,7 @@ namespace ShadySoft.Blazor.WebAssembly.Authentication.Client
         private readonly ClientAuthenticationOptions _options;
         private readonly HttpClient _http;
 
-        private static AuthenticationState newUnauthenticatedState = new AuthenticationState(new ClaimsPrincipal());
+        private static AuthenticationState newUnauthenticatedState = new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
 
         public SignInResult LastSignInResult { get; private set; } = SignInResult.Success;
 
@@ -54,10 +54,14 @@ namespace ShadySoft.Blazor.WebAssembly.Authentication.Client
             }
             catch (HttpRequestException e)
             {
-                if (e.GetProblemDetails().Status == 400)
+                try
+                {
                     LastSignInResult = e.GetSignInResult();
-                else
+                }
+                catch
+                {
                     throw e;
+                }
             }
 
             return LastSignInResult;
