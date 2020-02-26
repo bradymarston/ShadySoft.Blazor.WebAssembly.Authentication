@@ -12,5 +12,7 @@ namespace ShadySoft.Blazor.WebAssembly.Authentication.Client
         Task<bool> RefreshUserInfoAsync();
         Task<SignInResult> SignInAsync(TCredential credentials);
         Task SignOutAsync();
+
+        event AuthenticationStateChangedHandler AuthenticationStateChanged; 
     }
 }
